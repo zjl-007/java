@@ -14,15 +14,21 @@ import com.alibaba.fastjson.JSON;
 public class PathToTree {
 	public static void main(String[] args) {
 		System.out.println("ok`````");
+//		String [] l = PathToTree.getDevicesInfo();
+//		System.out.println(JSON.toJSONString(l));
+		Capture.startCapture(-1);
 	}
-	public static void start() {
-		Capture.startCapture();
+	public static void startCapture(int count) {
+		Capture.startCapture(count);
 	}
-	public static void stop() {
+	public static void stopCapture() {
 		Capture.stopCapture();
 	}
-	public static String[] getInfo() {
+	public static String[] getCaptureResult() {
 		return Capture.getCpatureInfo();
+	}
+	public static String[] getDevicesInfo() {
+		return Capture.getDevicesInfo();
 	}
 }
 	

@@ -2,10 +2,14 @@ package com;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.alibaba.fastjson.JSON;
 
+import jpcap.JpcapCaptor;
+import jpcap.NetworkInterface;
+import jpcap.NetworkInterfaceAddress;
 import jpcap.PacketReceiver;
 import jpcap.packet.*;
 import jpcap.packet.Packet;
@@ -26,36 +30,61 @@ class NetFetcher implements PacketReceiver{
 	public NetFetcher(String type) {
 		NetFetcher.packetType = type;
 	}
+	
+	public static List<Map<String, Object>> list = new ArrayList<>();
+    /**
+     * 扫描出所有的网卡信息
+     */
+    public static List<Map<String, Object>> devices() {
+        //封装的所有网卡信息
+        try{
+            NetworkInterface[] devices = JpcapCaptor.getDeviceList();
+            for (int i = 0; i < devices.length; i++) {
+                Map<String, Object> networkCardMap = new HashMap<>();
+                networkCardMap.put("id", i);   //id
+                networkCardMap.put("netcd_no", i);   //网卡在系统中的序列
+                networkCardMap.put("netcd_name", devices[i].name); //网卡名
+                networkCardMap.put("netcd_description", devices[i].description); //网卡名
+                NetworkInterfaceAddress[] addresses = devices[i].addresses;
+                networkCardMap.put("netcd_datalink_name", devices[i].datalink_name); //数据链路名称
+                networkCardMap.put("netcd_datalink_description", devices[i].datalink_description); //数据链路描述
+                for (int j = 0; j < addresses.length; j++) {
+                    if(j == 0) {
+                        networkCardMap.put("netcd_Iipv6", addresses[j].address.toString());   //ipv6
+                    } else if(j == 1) {
+                    	if(JSON.toJSONString(addresses[j]).contains("broadcast")) {
+                            networkCardMap.put("netcd_ipv4", addresses[j].address.toString()); //ipv4
+                            networkCardMap.put("netcd_broadcast", addresses[j].broadcast.toString()); //广播
+                            networkCardMap.put("netcd_subnet", addresses[j].subnet.toString()); //子网掩码
+                    	} else {
+                    		networkCardMap.put("netcd_Iipv6", addresses[j].address.toString());   //ipv6
+                    	}
+                    }
+                }
+                int length = devices[i].mac_address.length;  
+                int count = 1; 
+                StringBuilder sb = new StringBuilder("");
+                for (byte b : devices[i].mac_address) {  
+                    sb.append(Integer.toHexString(b & 0xff));
+                    if(count++ != length) 
+                        sb.append(":");
+                }
+                networkCardMap.put("netcd_mac", sb.toString());   //mac地址
+                //把所有的设备信息存入到
+                networkCardMap.put("dev", devices[i]);
+                System.out.println(JSON.toJSON(networkCardMap));
+                list.add(networkCardMap);
+            }
+            return list;
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+        System.out.println(JSON.toJSONString(list));
+        return list;
+    }
+    
 	@Override
 	public void receivePacket(Packet packet) {
-//		if(NetFetcher.packetType == "" ) {
-//			arrayList.add(JSON.toJSONString(arg0));
-//		} else if (NetFetcher.packetType == "ip") {
-//			IPPacket ip = (IPPacket) arg0;
-//			int protocolNum = ip.protocol;
-//			switch(protocolNum) {
-//				case 1: {
-//						icmp = (ICMPPacket) ip;
-//						
-//						break;
-//					}
-//				case 17: udp = (UDPPacket) ip;break;
-//			};
-//			System.out.println(icmp);
-//
-//			System.out.println(JSON.toJSONString(udp));
-//			//System.out.println(ip.protocol);
-//			if(ip.protocol == 17) {
-//				System.out.println(JSON.toJSONString(ip));
-//			}
-//			arrayList.add(JSON.toJSONString(ip));
-//		} else if (NetFetcher.packetType == "icmp") {
-//			ICMPPacket icmp = (ICMPPacket) arg0;
-//			System.out.println(JSON.toJSONString(icmp));
-//		}
-//		System.out.println(JSON.toJSONString(arg0));
-		
-		
 		infoMap = new HashMap<>();
         //分析协议类型
         if(packet instanceof ARPPacket) { //该协议无端口号
@@ -107,6 +136,8 @@ class NetFetcher implements PacketReceiver{
             infoMap.put("TargetMacAddr", getMacInfo(datalink.dst_mac));
         }
         arrayList.add(JSON.toJSONString(infoMap));
+        System.out.print("抓包数据");
+        System.out.println(JSON.toJSONString(infoMap));
 //        try {
 //            CatchDataToCache catchDataToCache = new CatchDataToCacheImpl();
 //            catchDataToCache.setInfoToCache(infoMap);
@@ -118,7 +149,9 @@ class NetFetcher implements PacketReceiver{
 //            }
 //        }
 	}
-	
+	/*
+	 * 数据包信息
+	 */
 	public static String[] getInfoArr() {
 		int len = arrayList.size();
 		String infoArr[] = new String[len];
@@ -126,6 +159,7 @@ class NetFetcher implements PacketReceiver{
 			System.out.println(arrayList.get(i));
 			infoArr[i] = arrayList.get(i);
 		}
+		arrayList.clear();
 		return infoArr;
 	}
 	
