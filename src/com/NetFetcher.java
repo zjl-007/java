@@ -15,7 +15,6 @@ import jpcap.packet.*;
 import jpcap.packet.Packet;
 
 class NetFetcher implements PacketReceiver{
-	public static String packetType = "";
 	public static ArrayList<String> arrayList = new ArrayList<>();
 	
 	public ICMPPacket icmp = null;
@@ -26,9 +25,13 @@ class NetFetcher implements PacketReceiver{
 	public String[] egpInfoArr;		//egp数据包数组
 	public String[] updInfoArr;		//udp数据包数组
 	
+	public static Boolean isCaptureing = false;    //判断是否在抓包
+	public static int currentPack = 1;			//计算当前抓包数
+	public static int totalPack;			//应当抓包数目
+	
 	public static Map<String, String> infoMap;
-	public NetFetcher(String type) {
-		NetFetcher.packetType = type;
+	public NetFetcher(int packCount) {
+		NetFetcher.totalPack = packCount;
 	}
 	
 	public static List<Map<String, Object>> list = new ArrayList<>();
@@ -85,6 +88,25 @@ class NetFetcher implements PacketReceiver{
     
 	@Override
 	public void receivePacket(Packet packet) {
+		if(NetFetcher.totalPack == 0) {
+			Capture.jpcapCaptor.breakLoop();
+			return;
+		}
+		if(NetFetcher.totalPack == -1) {
+			NetFetcher.isCaptureing = true;
+//			Capture.jpcapCaptor.breakLoop();
+		} else {
+			if(NetFetcher.currentPack < NetFetcher.totalPack) {
+				NetFetcher.isCaptureing = true;
+				NetFetcher.currentPack++;
+			}else {
+				NetFetcher.currentPack = 0;
+				NetFetcher.isCaptureing = false;
+//				System.out.println("NetFetcher.currentPack" + NetFetcher.currentPack);
+//				System.out.println("NetFetcher.totalPack" + NetFetcher.totalPack);
+			}
+		}
+		
 		infoMap = new HashMap<>();
         //分析协议类型
         if(packet instanceof ARPPacket) { //该协议无端口号
@@ -130,20 +152,23 @@ class NetFetcher implements PacketReceiver{
             infoMap.put("Caplen", String.valueOf(icmpPacket.caplen));
             infoMap.put("SecTime", String.valueOf(icmpPacket.sec));
             infoMap.put("SourceIp", icmpPacket.src_ip.getHostAddress());
+            infoMap.put("SourcePort", String.valueOf("无端口号"));
             
             infoMap.put("SourceMacAddr", getMacInfo(datalink.src_mac));
             infoMap.put("TargetIp", icmpPacket.dst_ip.getHostAddress());
+            infoMap.put("TargetPort", String.valueOf("无端口号"));
             infoMap.put("TargetMacAddr", getMacInfo(datalink.dst_mac));
         }
         arrayList.add(JSON.toJSONString(infoMap));
         System.out.print("抓包数据");
         System.out.println(JSON.toJSONString(infoMap));
+        System.out.println("NetFetcher.isCaptureing" + NetFetcher.isCaptureing);
 //        try {
 //            CatchDataToCache catchDataToCache = new CatchDataToCacheImpl();
 //            catchDataToCache.setInfoToCache(infoMap);
 //        } catch (Exception e) {
 //            log.info("抓取数据装入缓存时 出现异常，请检查：" + e);
-//            jpcap.breakLoop();
+//            jpcap.brea)kLoop();
 //            if(jpcap != null) {
 //                jpcap.close();
 //            }
@@ -156,10 +181,13 @@ class NetFetcher implements PacketReceiver{
 		int len = arrayList.size();
 		String infoArr[] = new String[len];
 		for(int i = 0; i < len; i++) {
-			System.out.println(arrayList.get(i));
 			infoArr[i] = arrayList.get(i);
 		}
-		arrayList.clear();
+//		if(NetFetcher.totalPack != -1) {
+//			arrayList.clear();
+//		}
+//		NetFetcher.isCaptureing = false;
+//		NetFetcher.currentPack = 0;
 		return infoArr;
 	}
 	
